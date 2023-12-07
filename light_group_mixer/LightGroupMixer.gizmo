@@ -1,0 +1,23 @@
+version 13.2 v3
+
+Group {
+ name LightGroupMixer
+ addUserKnob {20 LightGroupMixer}
+ addUserKnob {22 update_button l "Update lightgroups" -STARTLINE T light_group_mixer.update_light_group_mixer()}
+ addUserKnob {22 solo_button l "Unsolo all" -STARTLINE T light_group_mixer.reset_solos()}
+ addUserKnob {26 Showing l "Currently mixing:" T Nothing}
+ addUserKnob {26 Seperator l "" +STARTLINE}
+}
+ Input {
+  inputs 0
+  name Input1
+  selected true
+  xpos -154
+  ypos 239
+ }
+ Output {
+  name Output1
+  xpos -154
+  ypos 490
+ }
+end_group
