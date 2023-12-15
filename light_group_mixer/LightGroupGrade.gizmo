@@ -1,7 +1,9 @@
-#! C:/Program Files/Nuke13.2v3/nuke-13.2.3.dll -nx
-version 13.2 v3
-Gizmo {
- addUserKnob {20 User}
+Group {
+ name LightGroupGrade
+ selected true
+ xpos 433
+ ypos 28
+ addUserKnob {20 LightGroupGradeControlsTab l "LightGroupGrade"}
  addUserKnob {41 lightgroup l Lightgroup T Shuffle1.in1}
  addUserKnob {41 exposure l Exposure T Exposure.red}
  addUserKnob {41 multiply l Multiply T Grade.multiply}
@@ -18,7 +20,7 @@ Gizmo {
   xpos 363
   ypos 317
  }
-set Naf80b000 [stack 0]
+set N5254b400 [stack 0]
  Dot {
   name Dot2
   xpos 634
@@ -34,7 +36,7 @@ set Naf80b000 [stack 0]
   xpos 600
   ypos 373
  }
-set Naf80b800 [stack 0]
+set N5254bc00 [stack 0]
  Unpremult {
   name UnPremult
   xpos 600
@@ -66,8 +68,8 @@ set Naf80b800 [stack 0]
   xpos 634
   ypos 679
  }
-push $Naf80b000
-push $Naf80b800
+push $N5254b400
+push $N5254bc00
  Merge2 {
   inputs 2
   operation minus

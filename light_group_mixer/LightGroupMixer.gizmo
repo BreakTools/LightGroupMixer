@@ -1,8 +1,6 @@
-version 13.2 v3
-
 Group {
  name LightGroupMixer
- addUserKnob {20 LightGroupMixer}
+ addUserKnob {20 LightGroupMixerControlsTab l "LightGroupMixer"}
  addUserKnob {22 update_button l "Update lightgroups" -STARTLINE T light_group_mixer.update_light_group_mixer()}
  addUserKnob {22 solo_button l "Unsolo all" -STARTLINE T light_group_mixer.reset_solos()}
  addUserKnob {26 Showing l "Currently mixing:" T Nothing}

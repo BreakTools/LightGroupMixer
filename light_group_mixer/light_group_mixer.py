@@ -1,21 +1,25 @@
+"""Functions used by the lightgroupmixer node. Written by Mervin van Brakel, 2023."""
+
+from __future__ import annotations
+
 import nuke
 
+LIGHTGROUP_PREFIX = "LG_"
+LIGHTGROUP_GRADE_GIZMO_NAME = "LightGroupGrade"
 
 def update_light_group_mixer() -> None:
     """This function adds/removes our lightgroups to/from our gizmo."""
     lightgroup_mixer_node = nuke.thisNode()
 
-    channels = _get_all_channels(lightgroup_mixer_node)
-    if channels is None:
-        return
+    layers = _get_all_layers(lightgroup_mixer_node)
 
     all_lightgroups, lightgroups_to_build = _get_lightgroups(
-        lightgroup_mixer_node, channels
+        lightgroup_mixer_node, layers
     )
 
-    to_connect_to = _get_node_to_connect_to()
+    next_node_to_connect_to = _get_next_node_to_connect_to()
 
-    _add_lightgroups(lightgroups_to_build, to_connect_to, lightgroup_mixer_node)
+    _add_lightgroups(lightgroups_to_build, next_node_to_connect_to, lightgroup_mixer_node)
 
     lightgroups_to_remove = _get_old_unused_lightgroups(
         lightgroup_mixer_node, all_lightgroups
@@ -24,91 +28,102 @@ def update_light_group_mixer() -> None:
 
     reset_solos()
 
-
-def _get_all_channels(lightgroup_mixer_node: nuke.Node) -> list:
-    """This function returns all the channels from the input node."""
+def _get_all_layers(lightgroup_mixer_node: nuke.Node) -> list:
+    """This function returns all the layers from the input node."""
     try:
-        return lightgroup_mixer_node.input(0).channels()
+        channels = lightgroup_mixer_node.channels()
+        layers = list( set([c.split('.')[0] for c in channels]) )
+        return layers
+    
     except AttributeError:
         nuke.message("You haven't connected your input node.")
         return None
 
-
-def _get_node_to_connect_to() -> nuke.Node:
-    """This functions returns the node our next node should connect to."""
+def _get_next_node_to_connect_to() -> nuke.Node:
+    """This functions returns the node our next node within the lightmixer group should connect to."""
     try:
-        if nuke.toNode("Output1").input(0).Class() == "LightGroupGrade":
-            to_connect_to = nuke.toNode("Output1").input(0)
+        if nuke.toNode("Output1").input(0).Class() == LIGHTGROUP_GRADE_GIZMO_NAME:
+            next_node_to_connect_to = nuke.toNode("Output1").input(0)
         else:
-            to_connect_to = nuke.toNode("Input1")
+            next_node_to_connect_to = nuke.toNode("Input1")
 
     except AttributeError:
-        to_connect_to = nuke.toNode("Input1")
+        next_node_to_connect_to = nuke.toNode("Input1")
 
-    return to_connect_to
+    return next_node_to_connect_to
 
 
-def _get_lightgroups(lightgroup_mixer_node: nuke.Node, channels) -> tuple:
-    """This function returns all the lightgroups and the lightgroups we still need to build."""
+def _get_lightgroups(lightgroup_mixer_node: nuke.Node, layers: list) -> tuple[list, list]:
+    """This function returns all the lightgroups and the lightgroups we still need to build.
+    
+    Args:
+    lightgroup_mixer_node: The lightgroupmixer node that this code in ran from.
+    layers: List of layers in our comp
+    
+    Returns:
+    List of all light groups layers in the comp as defined by prefix
+    List of light groups that are not yet added to the mixer node
+    """
     all_knobs = lightgroup_mixer_node.knobs()
     all_lightgroups = []
     lightgroups_to_build = []
-    for channel in channels:
-        if not channel.startswith("LG_"):
+
+    for layer in layers:
+        if not layer.startswith(LIGHTGROUP_PREFIX):
             continue
 
-        # Seeing as lightgroups contains several subchannels, we just
-        # pick one. Blue is my favorite color, so I went with that :)
-        if not channel.endswith("blue"):
+        all_lightgroups.append(layer)
+
+        if f"{layer}_tab_begin" in all_knobs:
             continue
 
-        all_lightgroups.append(channel.split(".")[0])
-
-        if f"{channel.split('.')[0]}_tab_begin" in all_knobs:
-            continue
-
-        lightgroups_to_build.append(channel)
+        lightgroups_to_build.append(layer)
 
     return all_lightgroups, lightgroups_to_build
 
 
 def _add_lightgroups(
-    lightgroups_to_build, to_connect_to, lightgroup_mixer_node: nuke.Node
+    lightgroups_to_build: list, next_node_to_connect_to: nuke.Node, lightgroup_mixer_node: nuke.Node
 ) -> None:
-    """This function creates grader nodes and adds the proper menu items."""
+    """This function creates grader nodes and adds the proper menu items.
+
+    Args:
+    lightgroups_to_build: A list of lightgroups that we need to create grader gizmo and menu items for
+    next_node_to_connect_to: Node in our group that the next node should connect to
+    """
     for lightgroup in lightgroups_to_build:
-        grader_node = _create_grader_node(to_connect_to, lightgroup)
-        to_connect_to = grader_node
+        grader_node = _create_grader_node(next_node_to_connect_to, lightgroup)
+        next_node_to_connect_to = grader_node
 
         _create_menu_tab(lightgroup, lightgroup_mixer_node, grader_node)
 
-    nuke.toNode("Output1").setInput(0, to_connect_to)
+    nuke.toNode("Output1").setInput(0, next_node_to_connect_to)
 
 
 def _create_menu_tab(
     lightgroup: str, lightgroup_mixer_node: nuke.Node, grader_node: nuke.Node
 ) -> None:
     """This function creates the tab for a lightgroup and adds knobs to it."""
-    light_group_name = f"{lightgroup.split('LG_')[1].split('.')[0]}"
+    light_group_name = f"{lightgroup.split(LIGHTGROUP_PREFIX)[1].split('.')[0]}"
 
     lightgroup_tab_begin = nuke.Tab_Knob(
-        f"LG_{light_group_name}_tab_begin",
+        f"{LIGHTGROUP_PREFIX}{light_group_name}_tab_begin",
         light_group_name,
         nuke.TABBEGINCLOSEDGROUP,
     )
     lightgroup_mixer_node.addKnob(lightgroup_tab_begin)
 
     solo_button = nuke.PyScript_Knob(
-        f"LG_{light_group_name}_solo",
+        f"{LIGHTGROUP_PREFIX}{light_group_name}_solo",
         "Solo",
-        f"light_group_mixer.solo_lightgroup('LG_{light_group_name}')",
+        f"light_group_mixer.solo_lightgroup('{LIGHTGROUP_PREFIX}{light_group_name}')",
     )
     lightgroup_mixer_node.addKnob(solo_button)
 
     _link_lightgroupgrade_knobs(grader_node, lightgroup_mixer_node)
 
     lightgroup_tab_end = nuke.Tab_Knob(
-        f"LG_{light_group_name}_tab_end",
+        f"{LIGHTGROUP_PREFIX}{light_group_name}_tab_end",
         light_group_name,
         nuke.TABENDGROUP,
     )
@@ -140,13 +155,14 @@ def _link_lightgroupgrade_knobs(
         lightgroup_mixer_node.addKnob(link_knob)
 
 
+
 def _get_old_unused_lightgroups(
     lightgroup_mixer_node: nuke.Node, all_lightgroups: list
 ) -> list:
     """This functions constructs a list of old stored lightgroups that no longer exist."""
     lightgroups_to_remove = []
     for knob in lightgroup_mixer_node.knobs():
-        if not knob.startswith("LG_"):
+        if not knob.startswith(LIGHTGROUP_PREFIX):
             continue
 
         delete = True
@@ -168,9 +184,11 @@ def _remove_lightgroupgrade_nodes(
 ) -> None:
     """This function removes all LightGroupGrade nodes in a list."""
     for node in lightgroup_mixer_node.nodes():
-        if node.Class() == "LightGroupGrade":
-            if node.name() in lightgroups_to_remove:
-                nuke.delete(node)
+        if node.Class() != LIGHTGROUP_GRADE_GIZMO_NAME:
+            continue
+        if node.name() not in lightgroups_to_remove:
+            continue
+        nuke.delete(node)
 
 
 def solo_lightgroup(light_group_name: str) -> None:
@@ -216,7 +234,7 @@ def unsolo_lightgroup(light_group_name: str) -> None:
 def _set_solos(lightgroup_mixer_node: nuke.Node) -> None:
     """This function enables or disables our nodes based on our solo list."""
     for node in lightgroup_mixer_node.nodes():
-        if node.Class() != "LightGroupGrade":
+        if node.Class() != LIGHTGROUP_GRADE_GIZMO_NAME:
             continue
 
         if lightgroup_mixer_node["Showing"].value() == "All lightgroups":
